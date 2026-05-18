@@ -1,0 +1,34 @@
+[package]
+name = "cargo-agdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "MIT OR Apache-2.0"
+description = "Reproducible AGDK Android APK builds in constrained-egress environments — vendors the NDK + SDK + warm Gradle cache as content-addressed GitHub release assets."
+repository = "https://github.com/noahkagan/cargo-agdk"
+keywords = ["cargo-subcommand", "android", "agdk", "ndk", "gradle"]
+categories = ["development-tools::cargo-plugins", "command-line-utilities"]
+readme = "README.md"
+
+[[bin]]
+name = "cargo-agdk"
+path = "src/main.rs"
+
+[lib]
+name = "cargo_agdk"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+ureq = { version = "2", features = ["tls", "native-certs"] }
+sha2 = "0.10"
+tar = "0.4"
+zstd = "0.13"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
