@@ -5,14 +5,13 @@
 //!
 //! Preconditions on the maintainer's host:
 //! - `$ANDROID_HOME` with the requested NDK installed.
-//! - A `gradle` binary on `PATH` (any recent version — Gradle uses
-//!   `wrapper --gradle-version=X` to bootstrap the per-bundle
-//!   Gradle, so the system gradle is only the bootstrap).
 //! - `gh` authenticated with write access to `release::HOST`.
-//! - Full network egress to `*.google.com`.
+//! - Full network egress to `*.google.com` and `services.gradle.org`
+//!   (cargo-agdk downloads the requested Gradle distribution itself
+//!   — no system gradle needed).
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -83,8 +82,14 @@ pub fn run(opts: PublishOptions) -> Result<()> {
         }
     };
 
-    println!("publish: gradle wrapper --gradle-version={}", pins.gradle);
-    let status = Command::new("gradle")
+    let gradle_bin = download_gradle(&pins.gradle, &opts.output)?;
+
+    println!(
+        "publish: {} wrapper --gradle-version={}",
+        gradle_bin.display(),
+        pins.gradle
+    );
+    let status = Command::new(&gradle_bin)
         .args([
             "wrapper",
             "--gradle-version",
@@ -190,7 +195,7 @@ pub fn run(opts: PublishOptions) -> Result<()> {
 
 fn require_tools() -> Result<()> {
     let mut missing = Vec::new();
-    for cmd in ["gh", "gradle", "tar", "sha256sum"] {
+    for cmd in ["gh", "tar", "sha256sum"] {
         if Command::new(cmd).arg("--version").status().is_err() {
             missing.push(cmd);
         }
@@ -208,6 +213,61 @@ fn require_tools() -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Download `gradle-{version}-bin.zip` from services.gradle.org and
+/// extract under `output/gradle-{version}/`. Returns the path to the
+/// `bin/gradle` binary. Idempotent — re-uses an existing extract if
+/// the binary is already in place.
+fn download_gradle(version: &str, output: &Path) -> Result<PathBuf> {
+    let dist_root = output.join(format!("gradle-{version}"));
+    let bin = dist_root.join("bin/gradle");
+    if bin.exists() {
+        println!("publish: reusing gradle dist at {}", dist_root.display());
+        return Ok(bin);
+    }
+
+    let url = format!("https://services.gradle.org/distributions/gradle-{version}-bin.zip");
+    println!("publish: downloading {url}");
+    let resp = ureq::get(&url).call().map_err(|e| Error::Network {
+        url: url.clone(),
+        source: Box::new(e),
+    })?;
+    let zip_path = output.join(format!("gradle-{version}-bin.zip"));
+    {
+        let mut out = File::create(&zip_path)?;
+        let mut reader = resp.into_reader();
+        let mut chunk = [0u8; 64 * 1024];
+        loop {
+            let n = reader.read(&mut chunk)?;
+            if n == 0 {
+                break;
+            }
+            out.write_all(&chunk[..n])?;
+        }
+        out.flush()?;
+    }
+
+    println!(
+        "publish: extracting {} into {}",
+        zip_path.display(),
+        output.display()
+    );
+    let file = File::open(&zip_path)?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| Error::Other(format!("opening gradle zip: {e}")))?;
+    archive
+        .extract(output)
+        .map_err(|e| Error::Other(format!("extracting gradle zip: {e}")))?;
+    let _ = std::fs::remove_file(&zip_path);
+
+    if !bin.exists() {
+        return Err(Error::Other(format!(
+            "extracted gradle but {} is missing",
+            bin.display(),
+        )));
+    }
+    Ok(bin)
 }
 
 /// Drop the vendored sample to `dest` and rewrite the three pin

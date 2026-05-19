@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.1 — 2026-05-19
+
+`cargo agdk publish` now downloads the requested Gradle distribution
+from `services.gradle.org` itself, rather than requiring a system
+`gradle` on PATH (which had to be Gradle 7+ to parse the stock
+sample's `dependencyResolutionManagement` block). Maintainer
+publish-side prerequisite drops `gradle` and adds the
+`services.gradle.org` host to the required-egress list.
+
 ## v0.2.0 — 2026-05-19
 
 Architectural rewrite. cargo-agdk now owns bundle production +
