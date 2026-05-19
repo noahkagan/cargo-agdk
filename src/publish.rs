@@ -196,7 +196,14 @@ pub fn run(opts: PublishOptions) -> Result<()> {
 fn require_tools() -> Result<()> {
     let mut missing = Vec::new();
     for cmd in ["gh", "tar", "sha256sum"] {
-        if Command::new(cmd).arg("--version").status().is_err() {
+        let ok = Command::new(cmd)
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !ok {
             missing.push(cmd);
         }
     }
@@ -206,7 +213,11 @@ fn require_tools() -> Result<()> {
             missing.join(", "),
         )));
     }
-    let status = Command::new("gh").args(["auth", "status"]).status()?;
+    let status = Command::new("gh")
+        .args(["auth", "status"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()?;
     if !status.success() {
         return Err(Error::Other(
             "gh is not authenticated; run `gh auth login`".into(),
