@@ -278,6 +278,15 @@ fn download_gradle(version: &str, output: &Path) -> Result<PathBuf> {
             bin.display(),
         )));
     }
+    // zip crate's extract() doesn't preserve Unix permissions; the
+    // launcher script lands at 0644 and won't exec.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perm = std::fs::metadata(&bin)?.permissions();
+        perm.set_mode(0o755);
+        std::fs::set_permissions(&bin, perm)?;
+    }
     Ok(bin)
 }
 
