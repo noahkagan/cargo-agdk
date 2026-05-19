@@ -99,24 +99,8 @@ impl Config {
         Ok(cfg)
     }
 
-    pub fn lockfile_abs(&self) -> PathBuf {
-        self.workspace_root.join(&self.lockfile)
-    }
-
-    pub fn android_project_abs(&self) -> PathBuf {
-        self.workspace_root.join(&self.android_project)
-    }
-
-    pub fn agp_file_abs(&self) -> PathBuf {
-        self.workspace_root.join(&self.agp_file)
-    }
-
-    pub fn ndk_file_abs(&self) -> PathBuf {
-        self.workspace_root.join(&self.ndk_file)
-    }
-
-    pub fn gradle_file_abs(&self) -> PathBuf {
-        self.workspace_root.join(&self.gradle_file)
+    pub fn abs(&self, relative: &Path) -> PathBuf {
+        self.workspace_root.join(relative)
     }
 }
 

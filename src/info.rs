@@ -25,21 +25,19 @@ pub fn run(config: &Config) -> Result<()> {
     }
     println!();
 
+    let lockfile_abs = config.abs(&config.lockfile);
     match Lock::load(config) {
         Ok(lock) => {
-            println!("Lock ({}):", config.lockfile_abs().display());
+            println!("Lock ({}):", lockfile_abs.display());
             println!("  release tag  : {}", lock.release_tag);
             println!("  AGP          : {}", lock.agp_version);
             println!("  NDK          : {}", lock.ndk_version);
             println!("  Gradle       : {}", lock.gradle_version);
             println!();
             println!("Assets:");
-            for a in manifest::ASSETS {
-                let sha = lock
-                    .sha256_for(a.name)
-                    .expect("manifest asset name has a sha256 mapping");
-                println!("  {:14} {}", a.name, a.filename);
-                println!("                 sha256 = {}", sha);
+            for &kind in manifest::ALL {
+                println!("  {:14} {}", kind.as_str(), kind.filename());
+                println!("                 sha256 = {}", lock.sha256_for(kind));
             }
             println!();
             let root = cache::cache_root(&lock.release_tag)?;
@@ -48,10 +46,7 @@ pub fn run(config: &Config) -> Result<()> {
             println!("  installed : {}", if installed { "yes" } else { "no" });
         }
         Err(_) => {
-            println!(
-                "Lock ({}): NOT FOUND or NOT PARSED",
-                config.lockfile_abs().display()
-            );
+            println!("Lock ({}): NOT FOUND or NOT PARSED", lockfile_abs.display());
             println!("  Run `cargo agdk package --output <dir>`");
             println!("  from a full-egress publish host to populate it.");
         }

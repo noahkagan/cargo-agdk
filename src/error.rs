@@ -2,6 +2,29 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinKind {
+    Agp,
+    Ndk,
+    Gradle,
+}
+
+impl PinKind {
+    fn as_str(&self) -> &'static str {
+        match self {
+            PinKind::Agp => "AGP",
+            PinKind::Ndk => "NDK",
+            PinKind::Gradle => "Gradle",
+        }
+    }
+}
+
+impl std::fmt::Display for PinKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io: {0}")]
@@ -30,32 +53,13 @@ pub enum Error {
     NotInstalled(PathBuf),
 
     #[error(
-        "AGP version mismatch: {file} says {in_repo}, lock pinned to {pinned}. \
-         Either revert the AGP bump in the repo, or re-package the toolchain via \
+        "{kind} version mismatch: {file} says {in_repo}, lock pinned to {pinned}. \
+         Either revert the bump in the repo, or re-package the toolchain via \
          `cargo agdk package` on a full-egress publish host and upload the \
          resulting tarballs to the configured release-host."
     )]
-    AgpMismatch {
-        file: PathBuf,
-        in_repo: String,
-        pinned: String,
-    },
-
-    #[error(
-        "NDK version mismatch: {file} says {in_repo}, lock pinned to {pinned}. \
-         Re-package the toolchain from a full-egress publish host or revert the NDK bump."
-    )]
-    NdkMismatch {
-        file: PathBuf,
-        in_repo: String,
-        pinned: String,
-    },
-
-    #[error(
-        "Gradle version mismatch: {file} says {in_repo}, lock pinned to {pinned}. \
-         Re-package the toolchain from a full-egress publish host or revert the Gradle bump."
-    )]
-    GradleMismatch {
+    PinMismatch {
+        kind: PinKind,
         file: PathBuf,
         in_repo: String,
         pinned: String,

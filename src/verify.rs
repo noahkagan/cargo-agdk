@@ -12,16 +12,15 @@ use crate::version_check;
 /// existence check. Auto-installs the toolchain on first run.
 pub fn run(config: &Config, target_name: &str) -> Result<()> {
     let lock = Lock::load(config)?;
-    version_check::assert_pinned(config, &lock)?;
     let t = target::lookup(config, target_name)?;
-
     install::ensure_installed(config, &lock)?;
+    version_check::assert_pinned(config, &lock)?;
 
     let android_home = cache::android_home(&lock.release_tag)?;
     let gradle_home = cache::gradle_user_home(&lock.release_tag)?;
     let ndk_home = cache::ndk_home(&lock.release_tag, &lock.ndk_version)?;
 
-    let android_project = config.android_project_abs();
+    let android_project = config.abs(&config.android_project);
     let jnilibs = android_project
         .join("app/src")
         .join(&t.flavor)
@@ -51,7 +50,7 @@ pub fn run(config: &Config, target_name: &str) -> Result<()> {
     }
 
     let task = format!("assemble{}Debug", t.flavor_capitalized());
-    println!("cargo-agdk: ./gradlew --offline --no-daemon {}", task);
+    println!("cargo-agdk: ./gradlew --offline --no-daemon {task}");
     let gradlew = android_project.join("gradlew");
     let status = Command::new(&gradlew)
         .arg("--offline")

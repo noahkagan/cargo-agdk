@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::lock::Lock;
-use crate::manifest;
+use crate::manifest::AssetKind;
 use crate::version_check;
 
 /// Publish-role: bundle the locally-installed Android toolchain into
@@ -47,9 +47,9 @@ pub fn run(config: &Config, output: &Path) -> Result<()> {
         )));
     }
 
-    let ndk_tarball = output.join(manifest::ASSET_NDK.filename);
-    let sdk_tarball = output.join(manifest::ASSET_SDK.filename);
-    let cache_tarball = output.join(manifest::ASSET_GRADLE_CACHE.filename);
+    let ndk_tarball = output.join(AssetKind::Ndk.filename());
+    let sdk_tarball = output.join(AssetKind::Sdk.filename());
+    let cache_tarball = output.join(AssetKind::GradleCache.filename());
 
     println!("cargo-agdk: packing NDK -> {}", ndk_tarball.display());
     tar_zstd(
@@ -126,23 +126,22 @@ pub fn run(config: &Config, output: &Path) -> Result<()> {
         lock.save(config)?;
         println!(
             "cargo-agdk: wrote {} (release_tag={})",
-            config.lockfile_abs().display(),
+            config.abs(&config.lockfile).display(),
             lock.release_tag,
         );
     }
 
     println!();
-    for (asset, path) in [
-        (&manifest::ASSET_NDK, &ndk_tarball),
-        (&manifest::ASSET_SDK, &sdk_tarball),
-        (&manifest::ASSET_GRADLE_CACHE, &cache_tarball),
+    for (kind, path) in [
+        (AssetKind::Ndk, &ndk_tarball),
+        (AssetKind::Sdk, &sdk_tarball),
+        (AssetKind::GradleCache, &cache_tarball),
     ] {
         let size_mib = std::fs::metadata(path)?.len() / (1024 * 1024);
         println!(
             "  {:14} sha256 = {}  ({} MiB)",
-            asset.name,
-            lock.sha256_for(asset.name)
-                .expect("manifest asset name has a sha256 mapping"),
+            kind.as_str(),
+            lock.sha256_for(kind),
             size_mib,
         );
     }
@@ -182,12 +181,7 @@ fn derive_release_tag(
 }
 
 fn resolve_env_path(keys: &[&str]) -> Option<PathBuf> {
-    for k in keys {
-        if let Some(v) = std::env::var_os(k) {
-            return Some(PathBuf::from(v));
-        }
-    }
-    None
+    keys.iter().find_map(std::env::var_os).map(PathBuf::from)
 }
 
 /// Shell out to `tar --zstd` rather than building the tar+zstd
