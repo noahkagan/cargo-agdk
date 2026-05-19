@@ -53,12 +53,18 @@ pub fn run(opts: PublishOptions) -> Result<()> {
         )));
     }
 
+    // The child gradle process gets `current_dir(project_dir)`, and on
+    // Unix `Command::new(p)` resolves `p` in the child's cwd. So every
+    // path passed to `Command` (and every dir we change into) has to be
+    // absolute — otherwise the gradle launcher (under output/) becomes
+    // unfindable from the project dir.
     std::fs::create_dir_all(&opts.output)?;
-    let staging = opts.output.join("staging-project");
+    let output = opts.output.canonicalize()?;
+    let staging = output.join("staging-project");
     if staging.exists() {
         std::fs::remove_dir_all(&staging)?;
     }
-    let gradle_user_home = opts.output.join("gradle-user-home");
+    let gradle_user_home = output.join("gradle-user-home");
     if gradle_user_home.exists() {
         std::fs::remove_dir_all(&gradle_user_home)?;
     }
@@ -82,7 +88,7 @@ pub fn run(opts: PublishOptions) -> Result<()> {
         }
     };
 
-    let gradle_bin = download_gradle(&pins.gradle, &opts.output)?;
+    let gradle_bin = download_gradle(&pins.gradle, &output)?;
 
     println!(
         "publish: {} wrapper --gradle-version={}",
@@ -119,9 +125,9 @@ pub fn run(opts: PublishOptions) -> Result<()> {
         return Err(Error::GradleFailed(status.code().unwrap_or(-1)));
     }
 
-    let ndk_tarball = opts.output.join(AssetKind::Ndk.filename());
-    let sdk_tarball = opts.output.join(AssetKind::Sdk.filename());
-    let cache_tarball = opts.output.join(AssetKind::GradleCache.filename());
+    let ndk_tarball = output.join(AssetKind::Ndk.filename());
+    let sdk_tarball = output.join(AssetKind::Sdk.filename());
+    let cache_tarball = output.join(AssetKind::GradleCache.filename());
 
     println!("publish: packing NDK -> {}", ndk_tarball.display());
     tar_zstd(&android_home, &[&format!("ndk/{}", pins.ndk)], &ndk_tarball)?;
@@ -165,12 +171,12 @@ pub fn run(opts: PublishOptions) -> Result<()> {
         sdk_sha256: sha256_file(&sdk_tarball)?,
         gradle_cache_sha256: sha256_file(&cache_tarball)?,
     };
-    let manifest_path = opts.output.join("manifest.toml");
+    let manifest_path = output.join("manifest.toml");
     std::fs::write(&manifest_path, manifest.to_toml())?;
     println!("publish: wrote {}", manifest_path.display());
     println!();
     for &k in crate::manifest::ALL {
-        let path = opts.output.join(k.filename());
+        let path = output.join(k.filename());
         let size_mib = std::fs::metadata(&path)?.len() / (1024 * 1024);
         println!(
             "  {:14} sha256 = {}  ({} MiB)",
