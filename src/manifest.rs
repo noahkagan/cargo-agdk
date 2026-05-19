@@ -5,7 +5,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::pins::Pins;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssetKind {
@@ -53,14 +52,6 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn pins(&self) -> Pins {
-        Pins {
-            agp: self.agp_version.clone(),
-            ndk: self.ndk_version.clone(),
-            gradle: self.gradle_version.clone(),
-        }
-    }
-
     pub fn sha256_for(&self, kind: AssetKind) -> &str {
         match kind {
             AssetKind::Ndk => &self.ndk_sha256,

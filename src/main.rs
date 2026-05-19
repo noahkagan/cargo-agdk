@@ -95,21 +95,15 @@ fn run(cli: Cli) -> cargo_agdk::error::Result<()> {
             package,
             android_project,
         } => {
-            let cwd = std::env::current_dir()?;
-            let workspace = cargo_agdk::verify::find_workspace_root(&cwd)?;
-            let project = absolute(&android_project, &workspace);
+            let (project, workspace) = resolve_project(&android_project)?;
             cargo_agdk::verify::run(&package, &project, &workspace)
         }
         Cmd::Info { android_project } => {
-            let cwd = std::env::current_dir()?;
-            let workspace = cargo_agdk::verify::find_workspace_root(&cwd)?;
-            let project = absolute(&android_project, &workspace);
+            let (project, _) = resolve_project(&android_project)?;
             print_info(&project)
         }
         Cmd::Clean { android_project } => {
-            let cwd = std::env::current_dir()?;
-            let workspace = cargo_agdk::verify::find_workspace_root(&cwd)?;
-            let project = absolute(&android_project, &workspace);
+            let (project, _) = resolve_project(&android_project)?;
             clean(&project)
         }
         Cmd::Publish {
@@ -131,12 +125,17 @@ fn run(cli: Cli) -> cargo_agdk::error::Result<()> {
     }
 }
 
-fn absolute(p: &std::path::Path, workspace: &std::path::Path) -> PathBuf {
-    if p.is_absolute() {
-        p.to_path_buf()
+fn resolve_project(
+    android_project: &std::path::Path,
+) -> cargo_agdk::error::Result<(PathBuf, PathBuf)> {
+    let cwd = std::env::current_dir()?;
+    let workspace = cargo_agdk::verify::find_workspace_root(&cwd)?;
+    let project = if android_project.is_absolute() {
+        android_project.to_path_buf()
     } else {
-        workspace.join(p)
-    }
+        workspace.join(android_project)
+    };
+    Ok((project, workspace))
 }
 
 fn print_info(android_project: &std::path::Path) -> cargo_agdk::error::Result<()> {

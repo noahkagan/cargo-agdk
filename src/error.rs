@@ -2,23 +2,6 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PinKind {
-    Agp,
-    Ndk,
-    Gradle,
-}
-
-impl std::fmt::Display for PinKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            PinKind::Agp => "AGP",
-            PinKind::Ndk => "NDK",
-            PinKind::Gradle => "Gradle",
-        })
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io: {0}")]

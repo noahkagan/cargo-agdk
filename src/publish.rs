@@ -253,15 +253,7 @@ fn download_gradle(version: &str, output: &Path) -> Result<PathBuf> {
     let zip_path = output.join(format!("gradle-{version}-bin.zip"));
     {
         let mut out = File::create(&zip_path)?;
-        let mut reader = resp.into_reader();
-        let mut chunk = [0u8; 64 * 1024];
-        loop {
-            let n = reader.read(&mut chunk)?;
-            if n == 0 {
-                break;
-            }
-            out.write_all(&chunk[..n])?;
-        }
+        std::io::copy(&mut resp.into_reader(), &mut out)?;
         out.flush()?;
     }
 

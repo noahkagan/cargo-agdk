@@ -19,8 +19,7 @@ use crate::release;
 /// `cargo agdk verify <package>`.
 pub fn run(package: &str, android_project: &Path, workspace_root: &Path) -> Result<()> {
     let pins = pins::read(android_project)?;
-    let manifest = fetch_manifest(&pins)?;
-    ensure_installed(&pins, &manifest)?;
+    ensure_installed(&pins)?;
 
     let flavor = kebab_to_camel(package);
     let android_home = cache::android_home(&pins)?;
@@ -72,10 +71,29 @@ pub fn run(package: &str, android_project: &Path, workspace_root: &Path) -> Resu
     Ok(())
 }
 
+/// Install the toolchain bundle for `pins` if not already present.
+/// Once the per-tuple cache root carries `.installed`, returns
+/// immediately — no network — so steady-state verify is fully
+/// offline. The manifest is fetched lazily on first install.
+pub fn ensure_installed(pins: &Pins) -> Result<()> {
+    let root = cache::root(pins)?;
+    if root.join(".installed").exists() {
+        return Ok(());
+    }
+    let manifest = fetch_manifest(pins)?;
+    std::fs::create_dir_all(&root)?;
+    for &kind in manifest::ALL {
+        download_and_extract(pins, &manifest, kind, &root)?;
+    }
+    std::fs::write(root.join(".installed"), release::tag(pins))?;
+    println!("cargo-agdk: toolchain installed at {}", root.display());
+    Ok(())
+}
+
 /// Download the bundle's `manifest.toml` from cargo-agdk's release at
 /// the tag derived from the consumer's pins. 404 here is the
 /// "no published bundle for this pin tuple" case.
-pub fn fetch_manifest(pins: &Pins) -> Result<Manifest> {
+fn fetch_manifest(pins: &Pins) -> Result<Manifest> {
     let url = release::manifest_url(pins);
     println!("cargo-agdk: fetching manifest {url}");
     let resp = match ureq::get(&url).call() {
@@ -95,27 +113,8 @@ pub fn fetch_manifest(pins: &Pins) -> Result<Manifest> {
             });
         }
     };
-    let mut text = String::new();
-    resp.into_reader().read_to_string(&mut text)?;
+    let text = resp.into_string()?;
     Manifest::from_toml(&text)
-}
-
-pub fn ensure_installed(pins: &Pins, manifest: &Manifest) -> Result<()> {
-    let root = cache::root(pins)?;
-    if root.join(".installed").exists() {
-        println!(
-            "cargo-agdk: toolchain already installed at {}",
-            root.display(),
-        );
-        return Ok(());
-    }
-    std::fs::create_dir_all(&root)?;
-    for &kind in manifest::ALL {
-        download_and_extract(pins, manifest, kind, &root)?;
-    }
-    std::fs::write(root.join(".installed"), release::tag(pins))?;
-    println!("cargo-agdk: toolchain installed at {}", root.display());
-    Ok(())
 }
 
 fn download_and_extract(
@@ -209,15 +208,16 @@ fn capitalize_first(s: &str) -> String {
 }
 
 /// Locate the workspace root by walking up from `cwd` until a
-/// `Cargo.toml` containing `[workspace]` is found.
+/// `Cargo.toml` with a top-level `[workspace]` table is found.
 pub fn find_workspace_root(start: &Path) -> Result<PathBuf> {
     let mut p = start.to_path_buf();
     loop {
         let candidate = p.join("Cargo.toml");
-        if candidate.exists() {
-            let text = std::fs::read_to_string(&candidate)?;
-            if text.contains("[workspace]") {
-                return Ok(p);
+        if let Ok(text) = std::fs::read_to_string(&candidate) {
+            if let Ok(v) = text.parse::<toml::Value>() {
+                if v.get("workspace").is_some() {
+                    return Ok(p);
+                }
             }
         }
         if !p.pop() {
