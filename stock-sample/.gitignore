@@ -1,0 +1,8 @@
+/.gradle
+/app/build
+/build
+/gradle/wrapper/gradle-wrapper.jar
+/gradlew
+/gradlew.bat
+/ndk.version
+/local.properties

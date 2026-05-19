@@ -1,10 +1,10 @@
 [package]
 name = "cargo-agdk"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
-description = "Reproducible AGDK Android APK builds in constrained-egress environments — vendors the NDK + SDK + warm Gradle cache as content-addressed GitHub release assets."
+description = "Reproducible AGDK Android APK builds in constrained-egress environments — fetches a content-addressed toolchain bundle from cargo-agdk's own GitHub releases, no Google-host access required."
 repository = "https://github.com/noahkagan/cargo-agdk"
 keywords = ["cargo-subcommand", "android", "agdk", "ndk", "gradle"]
 categories = ["development-tools::cargo-plugins", "command-line-utilities"]
@@ -28,6 +28,7 @@ zstd = "0.13"
 thiserror = "1"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
+include_dir = "0.7"
 
 [profile.release]
 lto = "thin"

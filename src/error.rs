@@ -9,19 +9,13 @@ pub enum PinKind {
     Gradle,
 }
 
-impl PinKind {
-    fn as_str(&self) -> &'static str {
-        match self {
+impl std::fmt::Display for PinKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
             PinKind::Agp => "AGP",
             PinKind::Ndk => "NDK",
             PinKind::Gradle => "Gradle",
-        }
-    }
-}
-
-impl std::fmt::Display for PinKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
+        })
     }
 }
 
@@ -38,32 +32,31 @@ pub enum Error {
     },
 
     #[error(
+        "no published bundle for AGP {agp}, NDK {ndk}, Gradle {gradle} \
+         at {url}. Ask the cargo-agdk maintainer to publish one \
+         (`cargo agdk publish --agp {agp} --ndk {ndk} --gradle {gradle}`), \
+         or pin your project to a supported tuple."
+    )]
+    NoBundle {
+        agp: String,
+        ndk: String,
+        gradle: String,
+        url: String,
+    },
+
+    #[error(
         "checksum mismatch for `{asset}`: expected {expected}, got {actual}. \
-         The release likely hasn't been packaged yet — run \
-         `cargo agdk package` from a full-egress publish host and upload \
-         the resulting tarballs to the configured release-host."
+         The release at {tag} may be corrupt — re-publish it."
     )]
     ChecksumMismatch {
         asset: String,
         expected: String,
         actual: String,
+        tag: String,
     },
 
-    #[error("toolchain not installed at {0}; run `cargo agdk install` first")]
-    NotInstalled(PathBuf),
-
-    #[error(
-        "{kind} version mismatch: {file} says {in_repo}, lock pinned to {pinned}. \
-         Either revert the bump in the repo, or re-package the toolchain via \
-         `cargo agdk package` on a full-egress publish host and upload the \
-         resulting tarballs to the configured release-host."
-    )]
-    PinMismatch {
-        kind: PinKind,
-        file: PathBuf,
-        in_repo: String,
-        pinned: String,
-    },
+    #[error("could not parse {file}: {reason}")]
+    Parse { file: PathBuf, reason: String },
 
     #[error("cargo ndk exited with status {0}")]
     CargoNdkFailed(i32),
@@ -73,28 +66,6 @@ pub enum Error {
 
     #[error("expected APK at {0} but it's missing")]
     ApkNotFound(PathBuf),
-
-    #[error("unknown target `{0}`; check the [[target]] entries in agdk.toml")]
-    UnknownTarget(String),
-
-    #[error(
-        "no agdk.toml found by walking up from {0}. Create one at your \
-         workspace root, or pass --config <path>."
-    )]
-    ConfigNotFound(PathBuf),
-
-    #[error("agdk.toml has no [[target]] entries; at least one is required")]
-    NoTargets,
-
-    #[error(
-        "release-host in agdk.toml is `{0}` — that's a placeholder. \
-         Edit agdk.toml and set release-host to a real `<owner>/<repo>` \
-         before publishing."
-    )]
-    PlaceholderReleaseHost(String),
-
-    #[error("could not parse {file}: {reason}")]
-    Parse { file: PathBuf, reason: String },
 
     #[error("{0}")]
     Other(String),

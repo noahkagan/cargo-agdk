@@ -1,25 +1,26 @@
+//! Per-bundle cache under `~/.cache/cargo-agdk/<tag>/`. Keyed on
+//! the release tag so different pin tuples land in sibling dirs.
+
 use std::path::PathBuf;
 
 use crate::error::{Error, Result};
+use crate::pins::Pins;
+use crate::release;
 
-/// `~/.cache/cargo-agdk/<release_tag>/` (or the OS equivalent via
-/// `dirs::cache_dir()`). Keyed on `release_tag` so tag changes land
-/// in a sibling dir without clobbering an in-flight working tree on
-/// the older toolchain.
-pub fn cache_root(release_tag: &str) -> Result<PathBuf> {
+pub fn root(pins: &Pins) -> Result<PathBuf> {
     let base = dirs::cache_dir()
         .ok_or_else(|| Error::Other("no user cache directory (HOME unset?)".into()))?;
-    Ok(base.join("cargo-agdk").join(release_tag))
+    Ok(base.join("cargo-agdk").join(release::tag(pins)))
 }
 
-pub fn android_home(release_tag: &str) -> Result<PathBuf> {
-    Ok(cache_root(release_tag)?.join("android-home"))
+pub fn android_home(pins: &Pins) -> Result<PathBuf> {
+    Ok(root(pins)?.join("android-home"))
 }
 
-pub fn gradle_user_home(release_tag: &str) -> Result<PathBuf> {
-    Ok(cache_root(release_tag)?.join("gradle-user-home"))
+pub fn gradle_user_home(pins: &Pins) -> Result<PathBuf> {
+    Ok(root(pins)?.join("gradle-user-home"))
 }
 
-pub fn ndk_home(release_tag: &str, ndk_version: &str) -> Result<PathBuf> {
-    Ok(android_home(release_tag)?.join("ndk").join(ndk_version))
+pub fn ndk_home(pins: &Pins) -> Result<PathBuf> {
+    Ok(android_home(pins)?.join("ndk").join(&pins.ndk))
 }

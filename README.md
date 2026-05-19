@@ -1,40 +1,67 @@
 # cargo-agdk
 
 Reproducible AGDK Android APK builds in constrained-egress environments
-— vendors the NDK + SDK + warm Gradle cache as content-addressed
-GitHub release assets, no Google-host access required.
+— fetches a content-addressed toolchain bundle (NDK + SDK + warm Gradle
+cache) from this repo's GitHub releases, no Google-host access required.
 
 ## Install
 
-    cargo install --locked cargo-agdk
+    cargo install --git https://github.com/noahkagan/cargo-agdk --locked --tag v0.2.0 cargo-agdk
 
-## Setup
+(Crates.io publish is a follow-up; `cargo install --locked cargo-agdk`
+will work once that lands.)
 
-Create `agdk.toml` at your workspace root. A minimum example:
+## Consumer usage
 
-```toml
-release-host = "<your-org>/<your-toolchain-host-repo>"
+Zero configuration. From any cargo workspace with an `android/` Gradle
+project alongside cargo packages:
 
-[[target]]
-name    = "main"
-package = "my-game"
-flavor  = "main"
-cdylib  = "my_game_lib"
-```
+    cargo agdk verify <package>
 
-See `agdk.toml.example` for all configurable paths (lockfile,
-android-project, pin file paths) — every path used by cargo-agdk has
-a default but can be overridden.
+This reads the pinned AGP / NDK / Gradle versions from your project's
+conventional paths:
 
-## Usage
+- `android/gradle/libs.versions.toml` — AGP version
+- `android/ndk.version` — NDK version
+- `android/gradle/wrapper/gradle-wrapper.properties` — Gradle version
 
-    # Publish role (full-egress host, once per pin bump):
-    cargo agdk package --output ./toolchain-out
-    # ...followed by `gh release create / upload` to the configured
-    # release-host's GitHub releases.
+…constructs the matching bundle's release tag, downloads it from this
+repo's releases, sha-verifies against the published manifest, and runs
+cargo-ndk + `./gradlew --offline assemble<Flavor>Debug`. Flavor is
+inferred kebab→camel from the cargo package name.
 
-    # Verify role (constrained-egress consumer, every change):
-    cargo agdk verify main
+If no bundle exists for your pin tuple, you get a clear error
+pointing at the `publish` subcommand. Either pin to a supported tuple
+or open an issue.
+
+`cargo agdk info` prints the resolved pins, the expected release URL,
+and the local cache state. `cargo agdk clean` wipes the cache for the
+current tuple.
+
+## Maintainer publishing
+
+For each (AGP, NDK, Gradle) tuple cargo-agdk supports, the maintainer
+runs (once, on a full-egress host with `$ANDROID_HOME` carrying the
+right NDK, `gradle` and `gh` on PATH):
+
+    cargo agdk publish --agp 8.4.0 --ndk 27.2.12479018 --gradle 8.6
+
+The publish flow:
+
+1. Drops the vendored `stock-sample/` AGDK GameActivity project to a
+   temp dir.
+2. Rewrites the AGP / NDK pins into the sample.
+3. `gradle wrapper --gradle-version=X` bootstraps the wrapper.
+4. `./gradlew assembleDebug` primes the cache against the requested
+   Gradle.
+5. Tars NDK, SDK pieces, and the gradle cache into three assets.
+6. sha256s each, writes a manifest.toml.
+7. `gh release create` on this repo with the four files attached.
+
+If a consumer's deps aren't in the stock cache, the maintainer can
+prime against the consumer's own project instead:
+
+    cargo agdk publish --project /path/to/their/android --agp ... --ndk ... --gradle ...
 
 ## License
 
